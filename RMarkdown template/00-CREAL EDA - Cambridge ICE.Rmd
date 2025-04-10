@@ -1,0 +1,116 @@
+---
+title: "Exploratory Data Analysis report"
+author: "fatemeh.torabi@ice.cam.ac.uk"
+date: "`r Sys.Date()`"
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(knitr)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+if(!require(DT)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+
+library(tidyverse)
+library(knitr)
+library(DT)
+```
+
+# Structure of the portfolio
+
+### Abstract 
+Provide the reader with a succinct summary of your work
+
+### Introduction
+Provide an introduction to you portfolio to reader. 
+
+### Method
+covering data access requirements, ethics, metadata and all methodological aspects of your project
+
+### Results
+Use this section to showcase the results of your data manipulation that will contribute to the project
+
+### Conclusion
+Summaries your findings,discuss them in the context of other similar work or questions and suggestions for future work. Conclude your portfolio with what started your data exploration and what have the data contributed in the decisions for patient care or health service delivery.  
+
+
+# In text elements
+Some examples of having in-text elements as you develop your portfolio are provided here.
+
+* "# Headings"
+* "## Subheading 1"
+* "### subheading 2"
+* "#### subheading 3"
+
+## Hyperlinks
+
+[Healthcare Data Science](https://github.com/CambridgeICE-HDS/MSt-Healthcare-Data-Science)
+
+## Notice box 
+
+::: {.infobox .caution data-latex="{caution}"}
+
+The format to add boxes to your portfolio
+:::
+
+
+## Tables
+
+### In-text table
+
+A template format to add a table into 
+the document you can use the following md code structure. 
+
+|Data table    | Coverage     |Disease area            |
+|--------------|--------------|------------------------|
+|COVID-19 MS   | 2019-2020    |COVID-19 & MS           |
+|Heart Attack  | no time tag  |MI                      |
+|Cardiovascular| no time tag  |Cardio                  |
+
+# Data tables
+
+## defining a dataframe 
+
+```{r dataframe1, message=FALSE}
+MM.HDS <- data.frame(
+  Courses = c("Course 1","Course 2","Course 3","Course 4","Course 5"), 
+  Unit_Titles=c(
+    "Harnessing data for healthcare advancement",
+    "The impact of big data on healthcare",
+    "Mastering critical analysis in evidence-based healthcare",
+    "Navigating complex health data challenges",
+    "Capstone Assignment"
+  ),
+  Indicative_Learning_hours = c(
+    "30 hrs",
+    "30 hrs",
+    "30 hrs",
+    "30 hrs",
+    "30 hrs"
+  ))
+
+kable(MM.HDS)
+```
+
+## Interactive data elements
+
+```{r dataframe2, message=FALSE}
+DT::datatable(
+  MM.HDS,
+  extensions = 'Buttons',
+  options = list(
+              paging = TRUE,
+              searching = TRUE,
+              fixedColumns = TRUE,
+              autoWidth = TRUE,
+              ordering = TRUE,
+              dom = 'tB',
+              buttons = c('copy', 'excel')
+              ),
+              class = "display"
+)
+```
