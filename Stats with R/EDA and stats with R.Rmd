@@ -1,0 +1,414 @@
+---
+title: "Exploratory analysis of Welsh Health Survey"
+author: "fatemeh.torabi@ice.cam.ac.uk"
+date: "`r Sys.Date()`"
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+    toc: yes
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(knitr)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+if(!require(DT)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+if(!require(gtsummary)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+if(!require(broom)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+# Load the packages
+
+library(tidyverse)
+library(knitr)
+library(DT)
+library(gtsummary)
+library(broom)
+
+```
+
+```{R, message=FALSE, echo=FALSE}
+#loadind dataset
+library(readxl)
+WHS <- read_excel("C:/Users/Fatemah.torabi/OneDrive - Swansea University/FATEMEH/ICE/CREL/April 2025 Residential Info/data/WHS.xlsx")
+
+```
+# Abstract 
+
+**Background:** Wellbeing is a key indicator of population health, influenced by a range of social, physical, and demographic factors. Understanding how Body Mass Index (BMI), employment status and general health status relate to wellbeing can inform public health strategies.
+
+**Objective:** This study investigates whether overall wellbeing in the adult population varies by BMI, employment status and general health status.
+
+Methods: Using cross-sectional data from welsh health survey, we conducted linear regression analyses to assess the association between wellbeing scores and the explanatory variables. BMI and general health status were treated as a continuous predictor, while employment status was included as categorical variables. Interaction effects between BMI and general health status was also explored.
+
+Results: Preliminary findings suggest that wellbeing scores significantly vary across categories of general health status and employment status. Higher BMI was associated with lower wellbeing, though this relationship differed by sex. Women reported slightly lower wellbeing on average than men, adjusting for other covariates.
+
+Conclusion: Wellbeing is influenced by a combination of physical health (BMI), subjective health perception, and social determinants such as employment and sex. These findings highlight the importance of integrated approaches to wellbeing promotion that consider both medical and socio-economic factors.
+
+
+# Welsh Health Survey
+
+Overview of the dataset 
+
+```{r WHS, message=FALSE, echo=FALSE}
+DT::datatable(
+  head(WHS,20),
+  extensions = 'Buttons',
+  options = list(
+              paging = TRUE,
+              searching = TRUE,
+              fixedColumns = TRUE,
+              autoWidth = TRUE,
+              ordering = TRUE,
+              dom = 'tB',
+              buttons = c('copy', 'excel')
+              ),
+              class = "display"
+)
+```
+
+
+Derive variables 
+
+```{r data prep, message=FALSE, echo=FALSE}
+# Load dplyr package
+library(dplyr)
+
+WHS <- WHS %>%
+  mutate(
+    # Calculate wellbeing score as the sum of the four variables
+    wellb_score = wbSatis + wbWorth + wbHappy + wbAnx,
+    
+    # Calculate BMI from height (htcm) and weight (wtkg)
+    BMI = round(wtkg / ((htcm / 100) ^ 2),2) ,  # Convert htcm to meters and then calculate BMI
+    
+    # Create a new categorical variable based on BMI values
+    BMI_cat = case_when(
+      BMI < 18.5 ~ "Underweight",
+      BMI >= 18.5 & BMI < 24.9 ~ "Healthy",
+      BMI >= 25 & BMI < 29.9 ~ "Overweight",
+      BMI >= 30 ~ "Obese",
+      TRUE ~ "Unknown"  # Fallback for unexpected values (e.g., missing or negative BMI)
+    ),
+    
+    # Assign age group labels based on age5yrm
+    age_group = case_when(
+      Age5yrm == 1 ~ "16-19",
+      Age5yrm == 2 ~ "20-24",
+      Age5yrm == 3 ~ "25-29",
+      Age5yrm == 4 ~ "30-34",
+      Age5yrm == 5 ~ "35-39",
+      Age5yrm == 6 ~ "40-44",
+      Age5yrm == 7 ~ "45-49",
+      Age5yrm == 8 ~ "50-54",
+      Age5yrm == 9 ~ "55-59",
+      Age5yrm == 10 ~ "60-64",
+      Age5yrm == 11 ~ "65-69",
+      Age5yrm == 12 ~ "70-74",
+      Age5yrm == 13 ~ "75+",
+      TRUE ~ "Unknown"  # This is a fallback for unexpected values
+    ),
+    
+    # Assign Work variable levels (1 = employed, 2 = unemployed, else = unknown)
+    Work = case_when(
+      Work == 1 ~ "Employed",
+      Work == 2 ~ "Unemployed",
+      TRUE ~ "Unknown"  # This is a fallback for other values
+    ),
+    
+    # Assign genhlth (general health) variable levels
+    # this information is in "welsh-health-survey-2015-technical-report-en.pdf"
+    
+    genhlth = case_when(
+      genhlth == 1 ~ "Good",
+      genhlth == 2 ~ "Fairly good",
+      genhlth == 3 ~ "Not good",
+      genhlth == 4 ~ "(Don’t know)",
+      genhlth == 5 ~ "(Refusal)",
+      TRUE ~ "Unknown"  # This is a fallback for unexpected values
+    ),
+    
+    # Assign sex labels (1 = Male, 2 = Female)
+    Sex = case_when(
+      Sex == 1 ~ "Male",
+      Sex == 2 ~ "Female",
+      TRUE ~ "Unknown"  # This is a fallback for unexpected values
+    )
+  )
+
+#now selecting the variables to explore further
+WHS_selected <- WHS %>% 
+  select(wellb_score, BMI_cat, Work, genhlth, age_group, Sex)
+
+```
+
+The data preparation stage included defining variable levels and ensuring consistency across existing variables, these then been reduced to an analysis ready dataset which is demonstrated below
+
+```{r, echo=FALSE}
+DT::datatable(
+  head(WHS_selected,20),
+  extensions = 'Buttons',
+  options = list(
+              paging = TRUE,
+              searching = TRUE,
+              fixedColumns = TRUE,
+              autoWidth = TRUE,
+              ordering = TRUE,
+              dom = 'tB',
+              buttons = c('copy', 'excel')
+              ),
+              class = "display"
+)
+
+```
+
+Cleaning data
+```{r, echo=FALSE}
+# Clean the data: Remove rows where wellbeing score < 0 or any "unknown" values in categorical variables
+WHS_selected <- WHS_selected %>%
+  filter(
+    wellb_score >= 0,  # Remove rows where wellbeing score is less than 0
+    !Work %in% c("Unknown"),  # Remove rows where Work status is "Unknown"
+    !genhlth %in% c("Unknown")  # Remove rows where general health is "Unknown"
+  )
+```
+# Descriptive statistics 
+
+To summarize data using the tableone package in R, you can create descriptive statistics tables for both continuous and categorical variables in one go. This approach is particularly useful for summarizing key characteristics of your variables before conducting formal statistical tests.
+
+```{r, echo=FALSE, message=FALSE}
+# Define continuous variables
+continuous_vars <- c("wellb_score")
+
+# Define categorical variables
+categorical_vars <- c("Work", "genhlth", "age_group", "Sex","BMI_cat")
+
+# Create the summary table
+summary_table <- WHS_selected %>%
+    tbl_summary(
+    by = Sex,  # Stratify by sex, you can change this to other variables (e.g., "Work")
+    statistic = list(all_continuous() ~ "{mean} ({sd})",  # Format continuous variables as mean (SD)
+                     all_categorical() ~ "{n} ({p}%)"),  # Format categorical variables as n (%)
+    digits = all_continuous() ~ 2,  # Round continuous variables to 2 decimal places
+    missing = "no"  # Show missing data counts
+  )
+
+# Render the summary table in HTML format
+summary_table
+
+
+```
+
+# Distribution of Wellbeing Score
+First, we will explore the distribution of the wellbeing score to understand its shape and characteristics.
+
+```{r, echo=FALSE, message=FALSE}
+# Histogram of wellbeing score
+ggplot(WHS_selected, aes(x = wellb_score)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Wellbeing Score", x = "Wellbeing Score", y = "Frequency")
+
+```
+
+# Wellbeing Score by Age Group (Optional)
+Exploring the relationship between wellbeing score and age group can provide additional insights.
+
+```{r, echo=FALSE, message=FALSE}
+# Boxplot of wellbeing score by age group
+ggplot(WHS_selected, aes(x = age_group, y = wellb_score, fill = age_group)) +
+  geom_boxplot() +
+  labs(title = "Wellbeing Score by Age Group", x = "Age Group", y = "Wellbeing Score")  +
+  
+  # Rotating x-axis labels by 45 degrees
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+# Relationship Between Wellbeing Score and BMI Category
+
+We will now explore how wellbeing score varies by BMI category. We can use a boxplot to compare the wellbeing scores across different BMI categories.
+
+```{r, echo=FALSE, message=FALSE}
+# Boxplot of wellbeing score by BMI category
+ggplot(WHS_selected, aes(x = BMI_cat, y = wellb_score, fill = BMI_cat)) +
+  geom_boxplot() +
+  labs(title = "Wellbeing Score by BMI Category", x = "BMI Category", y = "Wellbeing Score") +
+  scale_fill_brewer(palette = "Set3")
+
+```
+
+# Relationship Between Wellbeing Score and Employment Status
+
+Now, let's visualiSe how wellbeing score varies by general health status. A boxplot will allow us to examine the distribution of wellbeing scores across different levels of general health.
+
+```{r, echo=FALSE, message=FALSE}
+# Boxplot of wellbeing score by general health status
+ggplot(WHS_selected, aes(x = genhlth, y = wellb_score, fill = genhlth)) +
+  geom_boxplot() +
+  labs(title = "Wellbeing Score by General Health Status", x = "General Health Status", y = "Wellbeing Score") +
+  scale_fill_brewer(palette = "Set3")
+```
+
+# Relationship Between Wellbeing Score and General Health Status
+
+A boxplot will allow us to examine the distribution of wellbeing scores across different levels of general health.
+
+```{r, echo=FALSE, message=FALSE}
+# Boxplot of wellbeing score by general health status
+ggplot(WHS_selected, aes(x = genhlth, y = wellb_score, fill = genhlth)) +
+  geom_boxplot() +
+  labs(title = "Wellbeing Score by General Health Status", x = "General Health Status", y = "Wellbeing Score") +
+  scale_fill_brewer(palette = "Set3")
+
+```
+
+# Formal statistical test of the hypothesis
+
+
+* The Generalized Linear Model (GLM) and Multiple Linear Regression provide insights into how BMI category, employment status, general health status, age group, and sex influence the wellbeing score.
+
+* Chi-square tests help assess the relationships between categorical variables like BMI category, employment status, and general health status.
+
+* ANOVA allows us to formally test if wellbeing score differs significantly across different categories e.g. BMI categories
+
+# Generalised Liner Regression (GLM)
+
+The output of the GLM provides estimates for the coefficients of each predictor variable. These coefficients represent the expected change in the wellbeing score (dependent variable) for a one-unit change in the corresponding independent variable, while holding all other variables constant.
+
+**Key Points to Describe:**
+
+Intercept: This is the estimated wellbeing score when all the predictor variables are at their reference level (e.g., the reference category of BMI_cat, Work, genhlth, etc.).
+
+Coefficients: These are the estimated effects of each predictor. For example:
+
+Here BMI_catObese has a coefficient of -0.44 for obese, it means that, compared to the reference category (e.g., healthy BMI), being obese is associated with a decrease of 0.44 units in the wellbeing score, holding other factors constant.
+
+For Work (Unemployed), a coefficient of -.36 indicates that being unemployed is associated with a lower wellbeing score, compared to being employed.
+
+GLM output also provides the standard error and p-values which can be used to evaluation statistical significance of the estimated coefficients at indicated significance levels. 
+
+```{r, echo=FALSE, message=FALSE}
+# Fit a Generalized Linear Model to predict wellbeing score
+glm_model <- glm(wellb_score ~ BMI_cat + Work + genhlth + age_group + Sex, 
+                 data = WHS_selected, 
+                 family = gaussian())
+
+# Summarize the GLM results
+#summary(glm_model)
+
+# Use broom package to tidy up the GLM coefficients
+glm_coef <- tidy(glm_model)
+
+# Filter out the intercept if you don't want to plot it
+glm_coef <- glm_coef %>%
+  filter(term != "(Intercept)")
+
+# Create a bar plot of the estimated coefficients
+ggplot(glm_coef, aes(x = reorder(term, estimate), y = estimate)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  geom_errorbar(aes(ymin = estimate - std.error, ymax = estimate + std.error), width = 0.2) +
+  coord_flip() +  # Flip the plot for better readability
+  theme_minimal() +
+  labs(title = "GLM Estimated Coefficients for Wellbeing Score",
+       x = "Predictor Variables",
+       y = "Estimated Coefficients") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+# Multiple Linear Regression
+To further investigate the relationship between the wellbeing score and multiple predictors, we can fit a multiple linear regression model.
+
+```{r, echo=FALSE, message=FALSE}
+# Fit a multiple linear regression model
+lm_model <- lm(wellb_score ~ BMI_cat + Work + genhlth + age_group + Sex, data = WHS_selected)
+
+# Summarize the regression model results
+#summary(lm_model)
+
+# Use broom package to tidy up the LM coefficients
+lm_coef <- tidy(lm_model)
+
+# Filter out the intercept if you don't want to plot it
+lm_coef <- lm_coef %>%
+  filter(term != "(Intercept)")
+
+# Create a bar plot of the estimated coefficients
+ggplot(lm_coef, aes(x = reorder(term, estimate), y = estimate)) +
+  geom_bar(stat = "identity", fill = "lightgreen") +
+  geom_errorbar(aes(ymin = estimate - std.error, ymax = estimate + std.error), width = 0.2) +
+  coord_flip() +  # Flip the plot for better readability
+  theme_minimal() +
+  labs(title = "LM Estimated Coefficients for Wellbeing Score",
+       x = "Predictor Variables",
+       y = "Estimated Coefficients") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+# Chi-Square Test
+
+The Chi-Square test is a statistical test used to determine if there is a significant association between two categorical variables. It compares the observed frequencies of events to the expected frequencies under the assumption of independence (no association).
+
+\[
+H_0: \text{The two variables are independent.}
+\]
+
+Since BMI category, employment status, and general health status are categorical, we can also perform Chi-Square tests to check for independence between these variables.
+
+The result will tell you whether BMI category and employment status/general health status are independent or related.
+
+```{r bw, echo=FALSE, message=FALSE, warning=FALSE}
+# Chi-square test between BMI category and employment status
+chi_bmi_work <- chisq.test(table(WHS_selected$BMI_cat, WHS_selected$Work))
+# Use broom to tidy the Chi-Square test results
+chi_bmi_work_tidy <- tidy(chi_bmi_work)
+# View the tidy output
+chi_bmi_work
+
+ggplot(WHS_selected, aes(x = BMI_cat, fill = Work)) +
+  geom_bar(position = "dodge") +
+ labs(title = "BMI Categories by Employment Status",
+       x = "BMI Category",
+       y = "Count") +
+  theme_minimal() +
+  scale_fill_manual(values = c("lightblue", "lightgreen", "lightcoral"))  
+```
+
+Chi-square test of BMI and general health status
+
+```{r bg, echo=FALSE, warning=FALSE}
+# Chi-square test between BMI category and general health status
+chi_bmi_genhlth <- chisq.test(table(WHS_selected$BMI_cat, WHS_selected$genhlth))
+# Use broom to tidy the Chi-Square test results
+chi_bmi_genhlth
+
+ggplot(WHS_selected, aes(x = BMI_cat, fill = genhlth)) +
+  geom_bar(position = "dodge") +
+  labs(title = "BMI Categories by General Health Status",
+       x = "BMI Category",
+       y = "Count") +
+  theme_minimal() +
+  scale_fill_manual(values = c("lightblue", "lightgreen", "lightcoral", "lightyellow", "lightpink")) 
+```
+
+# ANOVA: Wellbeing by BMI Category
+
+The results of ANOVA will tell you whether there are significant differences in wellbeing score across different BMI categories.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+anova_bmi <- aov(wellb_score ~ BMI_cat, data = WHS_selected)
+
+
+# Use broom to tidy the ANOVA results
+anova_bmi_tidy <- tidy(anova_bmi)
+
+# View the tidy output
+summary(anova_bmi)
+
+# Create a boxplot to visualize wellbeing score by BMI category
+ggplot(WHS_selected, aes(x = BMI_cat, y = wellb_score)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue") +
+  labs(title = "Wellbeing Score by BMI Category",
+       x = "BMI Category",
+       y = "Wellbeing Score") +
+  theme_minimal()
+```
