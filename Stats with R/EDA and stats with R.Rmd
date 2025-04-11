@@ -25,11 +25,13 @@ library(gtsummary)
 library(broom)
 
 ```
+# Import the dataset
 
+The following script needs to be replaced with appropriate file directly
 ```{R, message=FALSE, echo=FALSE}
 #loadind dataset
 library(readxl)
-WHS <- read_excel("C:/Users/Fatemah.torabi/OneDrive - Swansea University/FATEMEH/ICE/CREL/April 2025 Residential Info/data/WHS.xlsx")
+WHS <- read_excel("C:/Users/Fatemah.torabi/ICE/CREL/April 2025 Residential Info/data/WHS.xlsx")
 
 ```
 # Abstract 
